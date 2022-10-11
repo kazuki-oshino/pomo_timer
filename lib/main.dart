@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   runApp(const MyApp());
@@ -36,24 +37,45 @@ class _MyHomePageState extends State<MyHomePage> {
   Timer? _timer;
   late int _currentSeconds;
   bool isActive = false;
+  int _currentCompleteCount = 0;
+  late SharedPreferences prefs;
+
+  static const int timerDefaultTime = 25 * 60;
+  static const String completeCountKey = 'completeCount';
 
   @override
   void initState() {
     super.initState();
 
-    _currentSeconds = 25 * 60;
+    init();
   }
 
-  void startTimer() {
+  void init() async {
+    // 初期時間
+    _currentSeconds = timerDefaultTime;
+
+    // 完了回数
+    final p = await SharedPreferences.getInstance();
+    prefs = p;
+    final completeCount = prefs.getInt(completeCountKey) ?? 0;
+    _currentCompleteCount = completeCount;
+    setState(() {});
+  }
+
+  void startTimer() async {
     setState(() {
       isActive = true;
     });
 
     _timer = Timer.periodic(
       const Duration(seconds: 1),
-      (Timer timer) {
+      (Timer timer) async {
         if (_currentSeconds < 1) {
           timer.cancel();
+          isActive = false;
+          await addCount();
+          resetTimer();
+          setState(() {});
         } else {
           setState(() {
             _currentSeconds = _currentSeconds - 1;
@@ -61,6 +83,11 @@ class _MyHomePageState extends State<MyHomePage> {
         }
       },
     );
+  }
+
+  Future<void> addCount() async {
+    _currentCompleteCount = _currentCompleteCount + 1;
+    await prefs.setInt(completeCountKey, _currentCompleteCount);
   }
 
   void stopTimer() {
@@ -116,6 +143,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   .headline4!
                   .copyWith(fontSize: 180),
             ),
+            Text('達成回数${_currentCompleteCount.toString()}回！'),
           ],
         ),
       ),
