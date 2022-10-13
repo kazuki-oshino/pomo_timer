@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:system_tray/system_tray.dart';
 
@@ -51,6 +52,7 @@ class _MyHomePageState extends State<MyHomePage> {
   bool isActive = false;
   int _currentCompleteCount = 0;
   late SharedPreferences prefs;
+  int _notificationId = 1;
 
   static const int timerDefaultTime = 25 * 60;
   static const String completeCountKey = 'completeCount';
@@ -58,13 +60,17 @@ class _MyHomePageState extends State<MyHomePage> {
   final AppWindow _appWindow = AppWindow();
   final SystemTray _systemTray = SystemTray();
   final Menu _menuMain = Menu();
+  final FlutterLocalNotificationsPlugin _notificationsPlugin =
+      FlutterLocalNotificationsPlugin();
 
   @override
   void initState() {
     super.initState();
 
-    init();
+    initTimer();
     initSystemTray();
+    initializeNotifications(_notificationsPlugin);
+    requestPermissions(_notificationsPlugin);
   }
 
   @override
@@ -73,7 +79,7 @@ class _MyHomePageState extends State<MyHomePage> {
     _timer?.cancel();
   }
 
-  void init() async {
+  void initTimer() async {
     // 初期時間
     _currentSeconds = timerDefaultTime;
 
@@ -87,8 +93,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> initSystemTray() async {
     await _systemTray.initSystemTray(iconPath: 'assets/watanabe.jpeg');
-    _systemTray.setTitle('system tray!');
-    _systemTray.setToolTip('toolTipだよ！');
+    _systemTray.setTitle('25:00');
 
     _systemTray.registerSystemTrayEventHandler((eventName) {
       debugPrint('eventName: $eventName}');
@@ -100,10 +105,38 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
+  Future<void> initializeNotifications(
+      FlutterLocalNotificationsPlugin plugin) async {
+    const DarwinInitializationSettings initSettingsMacOS =
+        DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
+
+    const InitializationSettings initializationSettings =
+        InitializationSettings(macOS: initSettingsMacOS);
+    await plugin.initialize(initializationSettings);
+  }
+
+  Future<void> requestPermissions(
+      FlutterLocalNotificationsPlugin plugin) async {
+    await plugin
+        .resolvePlatformSpecificImplementation<
+            MacOSFlutterLocalNotificationsPlugin>()
+        ?.requestPermissions(
+          alert: true,
+          badge: false,
+          sound: false,
+        );
+  }
+
   void startTimer() async {
     setState(() {
       isActive = true;
     });
+
+    await _notificationsPlugin.cancelAll();
 
     _timer = Timer.periodic(
       const Duration(seconds: 1),
@@ -114,6 +147,7 @@ class _MyHomePageState extends State<MyHomePage> {
           await addCount();
           resetTimer();
           setState(() {});
+          await notification();
         } else {
           setState(() {
             _currentSeconds = _currentSeconds - 1;
@@ -149,13 +183,23 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
-  void add() {
+  Future<void> add() async {
     setState(() {
       _currentSeconds = _currentSeconds + 60;
     });
   }
 
-  void minus() {
+  Future<void> notification() async {
+    const title = 'ポモドーロ完了！';
+    var body = 'current complete count is $_currentCompleteCount!!!';
+    const notificationDetails =
+        NotificationDetails(macOS: DarwinNotificationDetails());
+    await _notificationsPlugin.show(
+        _notificationId, title, body, notificationDetails);
+    _notificationId = _notificationId + 1;
+  }
+
+  void minus() async {
     setState(() {
       _currentSeconds = _currentSeconds - 60;
     });
@@ -226,7 +270,7 @@ class _MyHomePageState extends State<MyHomePage> {
             child: const Icon(Icons.remove),
           ),
         ],
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+      ),
     );
   }
 }
