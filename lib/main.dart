@@ -127,7 +127,7 @@ class _MyHomePageState extends State<MyHomePage> {
         ?.requestPermissions(
           alert: true,
           badge: false,
-          sound: false,
+          sound: true,
         );
   }
 
@@ -192,8 +192,8 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> notification() async {
     const title = 'ポモドーロ完了！';
     var body = 'current complete count is $_currentCompleteCount!!!';
-    const notificationDetails =
-        NotificationDetails(macOS: DarwinNotificationDetails());
+    const notificationDetails = NotificationDetails(
+        macOS: DarwinNotificationDetails(sound: 'assets/sound1.mp3'));
     await _notificationsPlugin.show(
         _notificationId, title, body, notificationDetails);
     _notificationId = _notificationId + 1;
